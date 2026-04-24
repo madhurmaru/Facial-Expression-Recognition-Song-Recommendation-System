@@ -66,15 +66,22 @@ def encode_image_to_base64(image):
 
 def process_browser_frame(image_data):
     try:
+        print("CAMERA STEP 1: Function started", flush=True)
+
         if "," in image_data:
             image_data = image_data.split(",")[1]
+
+        print("CAMERA STEP 2: Base64 header removed", flush=True)
 
         img_bytes = base64.b64decode(image_data)
         np_arr = np.frombuffer(img_bytes, np.uint8)
 
         image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
+        print("CAMERA STEP 3: Image decoded", flush=True)
+
         if image is None:
+            print("CAMERA ERROR: Image is None", flush=True)
             return {
                 "emotion": "Image decode failed",
                 "confidence": 0,
@@ -86,6 +93,8 @@ def process_browser_frame(image_data):
         image = cv2.resize(image, (320, 240))
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
+        print("CAMERA STEP 4: Converted to gray", flush=True)
+
         face_rects = face_cascade.detectMultiScale(
             gray,
             scaleFactor=1.1,
@@ -93,58 +102,51 @@ def process_browser_frame(image_data):
             minSize=(40, 40)
         )
 
-        print("Faces detected:", len(face_rects), flush=True)
+        print("CAMERA STEP 5: Faces detected:", len(face_rects), flush=True)
 
         emotion_index = 4
         emotion_label = "No face detected"
         confidence = 0.0
 
         if len(face_rects) > 0:
+            print("CAMERA STEP 6: Face found, predicting emotion", flush=True)
+
             x, y, w, h = face_rects[0]
 
-            cv2.rectangle(
-                image,
-                (x, y),
-                (x + w, y + h),
-                (0, 255, 0),
-                2
-            )
+            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
             roi_gray = gray[y:y + h, x:x + w]
+            cropped_img = cv2.resize(roi_gray, (48, 48))
+            cropped_img = cropped_img.astype("float32") / 255.0
+            cropped_img = np.expand_dims(cropped_img, axis=-1)
+            cropped_img = np.expand_dims(cropped_img, axis=0)
 
-            if roi_gray.size > 0:
-                cropped_img = cv2.resize(roi_gray, (48, 48))
-                cropped_img = cropped_img.astype("float32") / 255.0
-                cropped_img = np.expand_dims(cropped_img, axis=-1)
-                cropped_img = np.expand_dims(cropped_img, axis=0)
+            prediction = emotion_model.predict(cropped_img, verbose=0)
 
-                prediction = emotion_model.predict(cropped_img, verbose=0)
+            print("CAMERA STEP 7: Model prediction done", flush=True)
 
-                emotion_index = int(np.argmax(prediction))
-                confidence = float(np.max(prediction)) * 100
-                emotion_label = emotion_dict.get(emotion_index, "Unknown")
+            emotion_index = int(np.argmax(prediction))
+            confidence = float(np.max(prediction)) * 100
+            emotion_label = emotion_dict.get(emotion_index, "Unknown")
 
-                cv2.putText(
-                    image,
-                    emotion_label,
-                    (x, max(y - 10, 25)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (255, 255, 255),
-                    2,
-                    cv2.LINE_AA
-                )
-
-                print(
-                    "Prediction:",
-                    emotion_label,
-                    "Confidence:",
-                    round(confidence, 2),
-                    flush=True
-                )
+            cv2.putText(
+                image,
+                emotion_label,
+                (x, max(y - 10, 25)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (255, 255, 255),
+                2,
+                cv2.LINE_AA
+            )
 
         processed_image = encode_image_to_base64(image)
+
+        print("CAMERA STEP 8: Image encoded", flush=True)
+
         df = music_rec(emotion_index)
+
+        print("CAMERA STEP 9: Songs loaded", flush=True)
 
         return {
             "emotion": emotion_label,
@@ -155,7 +157,7 @@ def process_browser_frame(image_data):
         }
 
     except Exception as e:
-        print("Error in process_browser_frame:", str(e), flush=True)
+        print("CAMERA ERROR:", str(e), flush=True)
 
         return {
             "emotion": "Prediction error",
