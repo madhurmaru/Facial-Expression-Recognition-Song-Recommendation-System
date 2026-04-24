@@ -8,25 +8,42 @@ headings = ("Name", "Album", "Artist")
 
 @app.route("/")
 def index():
-    df = music_rec(4)  # default Neutral
+    df = music_rec(4)  # Default: Neutral
     return render_template("index.html", headings=headings, data=df)
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "running"})
 
 
 @app.route("/predict_emotion", methods=["POST"])
 def predict_emotion():
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    if not data or "image" not in data:
+        if not data or "image" not in data:
+            return jsonify({
+                "emotion": "No image received",
+                "confidence": 0,
+                "faces": 0,
+                "processed_image": "",
+                "songs": []
+            }), 400
+
+        result = process_browser_frame(data["image"])
+        return jsonify(result)
+
+    except Exception as e:
+        print("SERVER ERROR:", str(e), flush=True)
+
         return jsonify({
-            "emotion": "No image received",
+            "emotion": "Server error",
             "confidence": 0,
             "faces": 0,
             "processed_image": "",
-            "songs": []
-        }), 400
-
-    result = process_browser_frame(data["image"])
-    return jsonify(result)
+            "songs": music_rec(4).to_dict(orient="records")
+        }), 500
 
 
 if __name__ == "__main__":
