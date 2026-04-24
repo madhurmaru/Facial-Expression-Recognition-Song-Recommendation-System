@@ -8,7 +8,7 @@ headings = ("Name", "Album", "Artist")
 
 @app.route("/")
 def index():
-    df = music_rec(4)  # default Neutral songs
+    df = music_rec(4)  # default Neutral
     return render_template("index.html", headings=headings, data=df)
 
 
@@ -19,6 +19,9 @@ def predict_emotion():
     if not data or "image" not in data:
         return jsonify({
             "emotion": "No image received",
+            "confidence": 0,
+            "faces": 0,
+            "processed_image": "",
             "songs": []
         }), 400
 
