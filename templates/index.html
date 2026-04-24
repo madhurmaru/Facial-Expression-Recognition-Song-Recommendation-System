@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Emotion-Based Music Recommender</title>
+
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
 
   <style>
@@ -35,9 +36,18 @@
 
     .video-feed {
       width: 100%;
+      height: auto;
       border-radius: 15px;
       box-shadow: 0px 0px 12px rgba(0, 0, 0, 0.3);
       background: black;
+    }
+
+    #video {
+      display: none;
+    }
+
+    #canvas {
+      display: none;
     }
 
     .table-container {
@@ -48,15 +58,18 @@
       max-height: 500px;
     }
 
-    table {
-      color: white;
-    }
-
     .emotion-box {
       text-align: center;
       font-size: 1.3rem;
       margin-top: 15px;
       font-weight: 600;
+    }
+
+    .small-info {
+      text-align: center;
+      opacity: 0.85;
+      margin-top: 5px;
+      font-size: 0.95rem;
     }
   </style>
 </head>
@@ -69,11 +82,18 @@
       <div class="col-md-6 video-col">
         <h2>🎭 Emotion Detector</h2>
 
-        <video id="video" class="video-feed" autoplay playsinline></video>
-        <canvas id="canvas" width="600" height="500" style="display:none;"></canvas>
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas" width="600" height="500"></canvas>
+
+        <img id="processedImage" class="img-fluid video-feed" />
 
         <div class="emotion-box">
-          Detected Emotion: <span id="emotion">Waiting...</span>
+          Detected Emotion: <span id="emotion">Starting camera...</span>
+        </div>
+
+        <div class="small-info">
+          Faces detected: <span id="faces">0</span> |
+          Confidence: <span id="confidence">0%</span>
         </div>
       </div>
 
@@ -87,12 +107,17 @@
   <script>
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
+    const processedImage = document.getElementById("processedImage");
+
     const emotionText = document.getElementById("emotion");
+    const facesText = document.getElementById("faces");
+    const confidenceText = document.getElementById("confidence");
     const resultArea = document.getElementById("ResultArea");
 
     navigator.mediaDevices.getUserMedia({ video: true })
       .then(function(stream) {
         video.srcObject = stream;
+        emotionText.innerText = "Camera started";
       })
       .catch(function(error) {
         console.error("Camera error:", error);
@@ -105,9 +130,10 @@
       }
 
       const context = canvas.getContext("2d");
+
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const imageData = canvas.toDataURL("image/jpeg");
+      const imageData = canvas.toDataURL("image/jpeg", 0.8);
 
       try {
         const response = await fetch("/predict_emotion", {
@@ -121,7 +147,14 @@
         const result = await response.json();
 
         emotionText.innerText = result.emotion;
-        createHtmlTable(result.songs);
+        facesText.innerText = result.faces || 0;
+        confidenceText.innerText = (result.confidence || 0) + "%";
+
+        if (result.processed_image) {
+          processedImage.src = result.processed_image;
+        }
+
+        createHtmlTable(result.songs || []);
 
       } catch (error) {
         console.error("Prediction error:", error);
@@ -160,7 +193,7 @@
       resultArea.appendChild(table);
     }
 
-    setInterval(captureAndPredict, 3000);
+    setInterval(captureAndPredict, 2000);
   </script>
 </body>
 </html>
