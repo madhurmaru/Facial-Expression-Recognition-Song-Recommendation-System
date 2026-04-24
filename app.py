@@ -20,11 +20,13 @@ def health():
 @app.route("/predict_emotion", methods=["POST"])
 def predict_emotion():
     try:
-        print("Received prediction request", flush=True)
+        print("STEP 1: Request received", flush=True)
 
         data = request.get_json()
+        print("STEP 2: JSON loaded", flush=True)
 
         if not data or "image" not in data:
+            print("STEP ERROR: No image received", flush=True)
             return jsonify({
                 "emotion": "No image received",
                 "confidence": 0,
@@ -33,7 +35,12 @@ def predict_emotion():
                 "songs": []
             }), 400
 
+        print("STEP 3: Sending image to camera.py", flush=True)
+
         result = process_browser_frame(data["image"])
+
+        print("STEP 4: Prediction complete", flush=True)
+
         return jsonify(result)
 
     except Exception as e:
