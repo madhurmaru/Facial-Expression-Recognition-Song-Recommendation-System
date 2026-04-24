@@ -35,14 +35,6 @@
       margin-bottom: 24px;
     }
 
-    #video {
-      display: none;
-    }
-
-    #canvas {
-      display: none;
-    }
-
     .video-feed {
       width: 100%;
       max-width: 600px;
@@ -51,6 +43,14 @@
       background: black;
       display: block;
       margin: 0 auto;
+    }
+
+    #canvas {
+      display: none;
+    }
+
+    #processedImage {
+      display: none;
     }
 
     .table-container {
@@ -93,10 +93,14 @@
       <div class="col-md-6">
         <h2>🎭 Emotion Detector</h2>
 
-        <video id="video" autoplay playsinline></video>
+        <!-- Raw browser camera preview -->
+        <video id="video" class="video-feed" autoplay playsinline muted></video>
+
+        <!-- Hidden canvas used to send frame to Flask -->
         <canvas id="canvas" width="320" height="240"></canvas>
 
-        <img id="processedImage" class="img-fluid video-feed" alt="Camera preview will appear here" />
+        <!-- Flask processed image with green box -->
+        <img id="processedImage" class="img-fluid video-feed" />
 
         <div class="emotion-box">
           Detected Emotion: <span id="emotion">Starting camera...</span>
@@ -132,29 +136,39 @@
 
     let isPredicting = false;
 
-    navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 320 },
-        height: { ideal: 240 },
-        facingMode: "user"
-      },
-      audio: false
-    })
-    .then(function(stream) {
-      video.srcObject = stream;
-      emotionText.innerText = "Camera started";
-      errorBox.innerText = "";
-    })
-    .catch(function(error) {
-      console.error("Camera error:", error);
-      emotionText.innerText = "Camera permission denied";
-      errorBox.innerText = "Allow camera permission and refresh the page.";
-    });
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 320 },
+            height: { ideal: 240 },
+            facingMode: "user"
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+
+        await video.play();
+
+        emotionText.innerText = "Camera started";
+        errorBox.innerText = "";
+
+        console.log("Camera started");
+        console.log("Video size:", video.videoWidth, video.videoHeight);
+
+      } catch (error) {
+        console.error("Camera error:", error);
+        emotionText.innerText = "Camera permission denied";
+        errorBox.innerText = "Allow camera permission and refresh the page.";
+      }
+    }
 
     async function captureAndPredict() {
       if (isPredicting) return;
 
       if (!video.videoWidth || !video.videoHeight) {
+        console.log("Video not ready yet");
         return;
       }
 
@@ -166,6 +180,8 @@
       const imageData = canvas.toDataURL("image/jpeg", 0.5);
 
       try {
+        console.log("Sending frame to Flask...");
+
         const response = await fetch("/predict_emotion", {
           method: "POST",
           headers: {
@@ -174,11 +190,15 @@
           body: JSON.stringify({ image: imageData })
         });
 
+        console.log("Response status:", response.status);
+
         if (!response.ok) {
           throw new Error("Server returned " + response.status);
         }
 
         const result = await response.json();
+
+        console.log("Prediction result:", result);
 
         emotionText.innerText = result.emotion || "Unknown";
         facesText.innerText = result.faces || 0;
@@ -186,6 +206,10 @@
 
         if (result.processed_image) {
           processedImage.src = result.processed_image;
+
+          // Hide raw video and show processed frame with green box
+          video.style.display = "none";
+          processedImage.style.display = "block";
         }
 
         createHtmlTable(result.songs || []);
@@ -241,7 +265,12 @@
       resultArea.appendChild(table);
     }
 
-    setInterval(captureAndPredict, 5000);
+    startCamera();
+
+    setTimeout(() => {
+      captureAndPredict();
+      setInterval(captureAndPredict, 5000);
+    }, 2000);
   </script>
 </body>
 </html>
