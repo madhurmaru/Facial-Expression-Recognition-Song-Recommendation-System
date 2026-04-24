@@ -1,33 +1,30 @@
-from flask import Flask, render_template, Response, jsonify
-import gunicorn
-from camera import *
+from flask import Flask, render_template, request, jsonify
+from camera import process_browser_frame, music_rec
 
 app = Flask(__name__, static_folder="static")
 
-headings = ("Name","Album","Artist")
-df1 = music_rec()
-df1 = df1.head(15)
-@app.route('/')
+headings = ("Name", "Album", "Artist")
+
+
+@app.route("/")
 def index():
-    print(df1.to_json(orient='records'))
-    return render_template('index.html', headings=headings, data=df1)
+    df = music_rec(4)  # default Neutral songs
+    return render_template("index.html", headings=headings, data=df)
 
-def gen(camera):
-    while True:
-        global df1
-        frame, df1 = camera.get_frame()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
 
-@app.route('/video_feed')
-def video_feed():
-    return Response(gen(VideoCamera()),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+@app.route("/predict_emotion", methods=["POST"])
+def predict_emotion():
+    data = request.get_json()
 
-@app.route('/t')
-def gen_table():
-    return df1.to_json(orient='records')
+    if not data or "image" not in data:
+        return jsonify({
+            "emotion": "No image received",
+            "songs": []
+        }), 400
 
-if __name__ == '__main__':
-    app.debug = True
-    app.run()
+    result = process_browser_frame(data["image"])
+    return jsonify(result)
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
