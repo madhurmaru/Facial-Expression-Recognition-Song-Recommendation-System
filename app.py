@@ -20,6 +20,8 @@ def health():
 @app.route("/predict_emotion", methods=["POST"])
 def predict_emotion():
     try:
+        print("Received prediction request", flush=True)
+
         data = request.get_json()
 
         if not data or "image" not in data:
